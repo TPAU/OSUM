@@ -1,11 +1,6 @@
-,zone,type,trips,int.pct,retl.emp,serv.emp,othr.emp,indy.emp,hh,sch.enrl,govt.emp
-Pioneer Memorial Hospital and mortuary,163,hbw,1918,0.7,0,179,0,0,0,0,0
-Meadow Lakes Golf Course and restaurant,219,hbro,150,0.6,0,10,0,0,0,0,0
-Airport,256,hbro,210,0.5,0,4,0,0,0,0,0
-Les S,174,hbw,3000,0.9,17,0,200,291,0,0,0
-Park,271,hbro,300,0.95,0,0,0,0,0,0,0
-Fairground,261,hbro,689,0.9,3,2,4,0,0,0,2
-Bi-Mart,218,hbshp,1666,0.8,48,0,0,0,0,0,0
-Stafford inn,218,hbro,384,0.2,0,43,0,0,0,0,0
-Best Western,216,hbro,116,0.2,0,13,0,0,0,0,0
-Landfill,190,nhb,72,0.5,0,0,0,8,0,0,0
+"","zone","type","trips","int.pct","retl.emp","serv.emp","othr.emp","hh","sch.enrl"
+"FredMeyer","127","hbshp",4500,0.5,222,0,0,0,0
+"PortBH","136","hbro",600,0.1,0,0,0,0,0
+"HarrisBeach1","110","hbro",300,0.6,0,0,0,0,0
+"HarrisBeach2","109","hbro",325,0.6,0,0,0,0,0
+"PostOffice","131","hbro",1000,1,0,0,0,0,0

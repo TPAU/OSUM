@@ -1,9 +1,11 @@
 # visitorModel.R
-# Code Base (C) 2.2: 6-1-16 (AB)
+# Code Base (C) 2.8: 10-22-18 (AB)
 
-# Written by Alex Bettinardi
+# Written by Alex Bettinardi (AB)
 # April 18, 2016
 # Re-run OSUM for a visitors subset of traverls if VISITORMODEL = TRUE.
+
+# updated 10-22-18 Alex Bettinardi to allow Visum 18 to work
 
 #######################################
 #  visitor model for Newport
@@ -22,7 +24,7 @@ if(vStage == 1){
    
       rm(vStage)
       # first save everything in the working directory with the exception of the functions and the Visum connection
-      workspaceKeepList <- c("workspaceKeepList","ePopUp","osumFun", "serverLocalSource", "VisFun", "Visum")
+      workspaceKeepList <- c("workspaceKeepList","ePopUp","osumFun", "serverLocalSource", "VisFun", "Visum", "vVer") # AB 10-22-18 updated to retain "vVer"
       save(list=ls()[!(ls() %in% workspaceKeepList)], file="data/residents.Rdata")
 
       # Clear Work Space of standard OSUM (residence) results
@@ -76,7 +78,7 @@ if(vStage == 2){
    
       rm(vStage)
       # first save everything in the working directory with the exception of the functions and the Visum connection
-      workspaceKeepList <- c("workspaceKeepList","visitorModel","pk.time","offpk.time","ePopUp","osumFun", "serverLocalSource", "VisFun", "Visum")
+      workspaceKeepList <- c("workspaceKeepList","visitorModel","pk.time","offpk.time","ePopUp","osumFun", "serverLocalSource", "VisFun", "Visum", "vVer") # AB 10-22-18 updated to retain "vVer"
       save(list=ls()[!(ls() %in% workspaceKeepList)], file="data/residents.Rdata")
 
       # Clear Work Space of standard OSUM (residence) results
@@ -128,7 +130,7 @@ if(vStage == 3){
       
       rm(vStage)
       # first save everything in the working directory with the exception of the functions and the Visum connection
-      workspaceKeepList <- c("workspaceKeepList","visitorModel","pk.time","offpk.time","ePopUp","osumFun", "serverLocalSource", "VisFun", "Visum")
+      workspaceKeepList <- c("workspaceKeepList","visitorModel","pk.time","offpk.time","ePopUp","osumFun", "serverLocalSource", "VisFun", "Visum", "vVer") # AB 10-22-18 updated to retain "vVer"
       save(list=ls()[!(ls() %in% workspaceKeepList)], file="data/residents_temp.Rdata")
 
       # Clear Work Space of standard OSUM (residence) results

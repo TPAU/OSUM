@@ -1,5 +1,5 @@
 # Model_Inputs.R
-# Code Base (C) 2.2: 6-1-16 (AB)
+# Code Base (C) 2.8: 11-20-18 (AB)
 
 # This script inputs data needed to run the model
 # 
@@ -12,6 +12,9 @@
 # Revised: 4/11/16 Alex Bettinardi alexander.o.bettinardi@odot.state.or.us - re-aligned OSUM with the latest version of externalModel_SWIM.R
 # Revised: 4/18/16 Alex Bettinardi alexander.o.bettinardi@odot.state.or.us - Updated to take the "data" folder as an input (dataDir).  This is needed for Newport - dual - logic
 # Revised: 6/1/16 Alex Bettinardi - corrected spelling of "vistorModel" due to edits needs in trip_distribution.r
+# Revised: 1/4/18 Alex Bettinardi - removed load of    library(doParallel)  - this is now completed in the "externalModel_SWIM.R" script.
+# Revised  1/31/18 Alex Bettinardi - added a step to 50/50 the external demand to help ensure a 50/50 daily split.
+# Revised  1/31/18 Alex Bettinardi - The SWIM external model requires that "year" value be numeric, adding a catch for that. 
 
 # This script loads all the data needed to run the model.
 # This sciprt loads land use and peak hour data from the VISUM network,
@@ -275,8 +278,11 @@ if(ifelse(is.null(comGetProperty(vbConv("Visum.Net"), "AttValue", "SWIMEXTERNALM
    #start "fun" list to match JEMnR
    fun <- list()
    source("rcode\\externalModel_SWIM.R")
-   attach(fun) 
-   library(doParallel) # required for SWIM external model     
+   attach(fun)    
+   
+   # Ensure the year value is numeric - AB 11-20-18
+   year <- as.numeric(year)
+   
    # load required objects and rename existing object to match JEMnR 
    SWIM_SL_Filename_Pattern <- comGetProperty(vbConv("Visum.Net"), "AttValue", "EXT_MODEL_DATA_FILENAME_PATTERN")     
    externalDisaggregateMethodNumber <- comGetProperty(vbConv("Visum.Net"), "AttValue", "EXT_MODEL_DISAGGREGATE_METHOD_NUMBER")
@@ -381,6 +387,16 @@ if(ifelse(is.null(comGetProperty(vbConv("Visum.Net"), "AttValue", "SWIMEXTERNALM
       spec.gen.dist <- tapply(as.vector(spec.gen.dist), as.list(expand.grid(unlist(lapply(strsplit(rownames(spec.gen.dist), " "), function(x) x[1])), unlist(lapply(strsplit(colnames(spec.gen.dist), " "), function(x) x[1])))), sum)
 	    spec.gen.dist <- spec.gen.dist[,colSums(spec.gen.dist)!=0]
    }
+	
+	 # 1/31/18 AB
+	 # adding a step to 50/50 the IE / EI demand, before the ipf process to help ensure a 50/50 daily split on the demand
+	 load(paste(storeLoc, "externalOD_ZnZnTdMd.RData", sep=""))
+	 for(d3 in dimnames(ext.ZnZnTdMd)[[3]]){
+	    for(d4 in dimnames(ext.ZnZnTdMd)[[4]]){
+         ext.ZnZnTdMd[,,d3,d4] <- (ext.ZnZnTdMd[,,d3,d4] + t(ext.ZnZnTdMd[,,d3,d4]))/2
+	 }}
+	 rm(d3,d4)
+   save(ext.ZnZnTdMd, file=paste(storeLoc, "externalOD_ZnZnTdMd.RData", sep=""))
 	
 	 # IPF external matrix to counts   
    ipfExtMatsToCounts(IPF,storeLoc) #set to FALSE to skip IPF and just collapse on purpose 

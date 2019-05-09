@@ -1,5 +1,5 @@
 # future_hhs.R
-# Code Base (C) 2.2: 4-13-16 (AB)
+# Code Base (C) 2.8: 5-24-18 (AB)
 
 # This program calculates the number of future HHs by TAZ for the Oregon small urban area model 
 #
@@ -11,6 +11,7 @@
 # Updated: 1/13/14 Alex Bettinardi alexander.o.bettinardi@odot.state.or.us - to work with OSUM V2
 # Update:  8/27/15 Alex Bettinardi alexander.o.bettinardi@odot.state.or.us - small update to ensure that row and col control totals are equal for the ipf to close properly.
 # Update:  4/13/16 Alex Bettinardi - small update to allow for the vistor model
+# Update:  5/24/18 Alex Bettinardi - removed t-test pring to screen which is not used by OSUM analysts.
 #
 # Define function for predicting household size distributions
 #Added a title parameter and changed the spline line width and color
@@ -140,8 +141,11 @@ hhfutr <- function () {
      #Test to see if there is a significant difference between the family and HH average HH size
      #Check p value (p > 0.05 no significant difference 95% of the time)
 	ttest<-t.test(census.block$ahhsbase,taz.data$ahhsbase)
-	cat(noquote("\nt test p value of avg family size at the block level vs avg HH size at the taz level\n"))
-	print(ttest$p.value)
+	
+  # 5-24-18 Alex Bettinardi - removed print to screen, since analysts don't use this information and it just
+  #                           adds confusion as opposed to help with model opperation understanding.  
+  #cat(noquote("\nt test p value of avg family size at the block level vs avg HH size at the taz level\n"))
+	#print(ttest$p.value)
      
      #Format object to be read by hhsize.R spline fit function
      #Renames the colnames to the names required by the predictHHsizes function

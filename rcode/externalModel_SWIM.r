@@ -35,6 +35,13 @@
     #                        Added code to replace the taz table loaded from the taz.csv file in the inputs folder with a 
     #                        taz with the full population (University model run only)   
     # Alex Bettinardi     alexander.o.bettinardi@odot.state.or.us 3/2/16- re-unified the ABM, OSUM, and JEMnR code, removed CALM specific code - that process is handled externally to this code.
+    # Alex Bettinardi     alexander.o.bettinardi@odot.state.or.us 7/20/16- fixed identifed time-of-day coding issue, and corrected issue where county employement projections are assumed to hold true into the future. 
+    # Alex Bettinardi     alexander.o.bettinardi@odot.state.or.us 3/13/17- Updated the LDT filename that the code points to (the person copy was never a good one to use, and we have found that SWIM is not exporting correctly, additionally fixed a small issue/warning with the error reporting fuctionality that PB added, and which should probably eventually be removed.
+    # Alex Bettinardi     alexander.o.bettinardi@odot.state.or.us 3/21/17- The code was not properly setup to work with disaggregate Method, "SWIMPCT" (1), updates were made to allow this functionality to work.
+    # Alex Bettinardi     alexander.o.bettinardi@odot.state.or.us 1/5/18 - Blocked load and library warnings, removed redundent error file print, upped iterations in IPF to 100.
+    # Alex Bettinardi     alexander.o.bettinardi@odot.state.or.us 9/19/18 - Corrected for the condition that a night OD by purpose could be totally empty - reporting back to the user if controls don't match in general
+    # Alex Bettinardi     alexander.o.bettinardi@odot.state.or.us 1/23/19 - Corrected a spelling error in the IPF warning message
+    # Alex Bettinardi     alexander.o.bettinardi@odot.state.or.us 3/13/19 - Updating some small typos in messages to the screen
           
       ############################ CREATE EXTERNAL OD MATRICES ############################################      
       #create external PA matrices (for multiple SWIM select link output scenarios)
@@ -51,6 +58,11 @@
       # 2.1: Reshapes matrix to a square matrix and then converts into local zone matrix 
       # 2.2: Truck trips are computed in similar way as total auto trips
       
+    # load required libraries
+    options(warn=-1)
+    suppressMessages(library(doParallel))
+    options(warn=0)  
+
                             
     cat("External model based on SWIM subarea process\n\n")
     
@@ -98,7 +110,7 @@
                                    
                                     #If output file doesn't exist, create it
                                     if(!file.exists(outFileName)) {
-                                          print(paste("process SWIM select link datasets to create RData files\n", outFileName))
+                                          writeLines(paste("process SWIM select link datasets to create RData files\n", outFileName)) # 3-13-19 AB - change from a print to a writeLines so that the \n would work properly
                                     		  #Read year of SWIM run from file name   
                                           parsedName = strsplit(strsplit(datasets[d],SWIM_SL_Filename_Pattern)[[1]][1],"_")[[1]]
                                           swimyr = as.integer(parsedName[length(parsedName)])
@@ -107,7 +119,7 @@
                                     	    unzip(paste(inputLoc, datasets[d], sep=""), files = NULL, list = FALSE, overwrite = TRUE, junkpaths = TRUE, exdir = folderName)
                                     	    ct.. <- read.csv(paste(folderName, "/Trips_CTTruck_select_link.csv", sep=""), as.is=T)
                                     	    et.. <- read.csv(paste(folderName, "/Trips_ETTruck_select_link.csv", sep=""), as.is=T)
-                                    	    ldt.. <- read.csv(paste(folderName, "/Trips_LDTPerson_select_link.csv", sep=""), as.is=T)
+                                    	    ldt.. <- read.csv(paste(folderName, "/Trips_LDTVehicle_select_link.csv", sep=""), as.is=T) # changed this from Persons to Vehicle - 3-13-17 AB
                                     	    sdt.. <- read.csv(paste(folderName, "/Trips_SDTPerson_select_link.csv", sep=""), as.is=T)
                                     	    emp.AzIn <- read.csv(paste(folderName, "/Employment.csv", sep=""), as.is=T)
                                     	    rownames(emp.AzIn) <- emp.AzIn$Azone
@@ -261,13 +273,15 @@
                                   Pop.Co <- tapply(Crosswalk$LOCALPOP, Crosswalk$County,sum)
                                   countyPopTotals <- tapply(sph.AzIp[!(rownames(sph.AzIp) %in% names(Pop.Az)), "AdjustPop"], sph.AzIp[!(rownames(sph.AzIp) %in% names(Pop.Az)), "County"], sum)[names(Pop.Co)]
                                   popFac.Co <- (Pop.CoYr[names(Pop.Co),as.character(year)] - Pop.Co) / countyPopTotals
+                                  # 7-20-16 AB - new hard stop if any of these values are negative
+                                  if(any(popFac.Co<0)) stop("Some of the County level population controls went negative.\nThis is a hard stop in the code in the SWIM external model.\nYou need to review your total population by County in your TAZ input and the year you have specfied for this model.\nThis error indicates that those county level population totals are greater than the population totals by year in the swimControl.Rdata input file.\nMeaning that you have more population for your County in your model than has been specified by OEA.\nReivew TAZ, year, and swimControls.RData inputs to determine where the issue is.\nAsk Alex Bettinardi if there are any questions.") 
                                                    
                                   #Adjust Population using County Controls
                                   curAdjPop <- sph.AzIp[!(rownames(sph.AzIp) %in% names(Pop.Az)) & (sph.AzIp$County %in% names(Pop.Co)), "AdjustPop"]
                                   popFacByCnty <- popFac.Co[sph.AzIp[!(rownames(sph.AzIp) %in% names(Pop.Az)) & (sph.AzIp$County %in% names(Pop.Co)), "County"]]
-                                  sph.AzIp[!(rownames(sph.AzIp) %in% names(Pop.Az)) & (sph.AzIp$County %in% names(Pop.Co)), "AdjustPop"] <- curAdjPop * popFacByCnty
+                                  sph.AzIp[!(rownames(sph.AzIp) %in% names(Pop.Az)) & (sph.AzIp$County %in% names(Pop.Co)), "AdjustPop"] <- curAdjPop * popFacByCnty                    
 
-                                  #Update County Poulation controls 
+                                  #Update County Employment controls 
                                   Emp.Co <- tapply(Crosswalk$LOCALEMP, Crosswalk$County,sum)
                                   countyEmpTotals <- tapply(sph.AzIp[!(rownames(sph.AzIp) %in% names(Emp.Az)), "AdjustEmp"], sph.AzIp[!(rownames(sph.AzIp) %in% names(Emp.Az)), "County"], sum)[names(Emp.Co)]
                                   empFac.Co <- (Emp.CoYr[names(Emp.Co),as.character(year)] - Emp.Co) / countyEmpTotals
@@ -275,7 +289,9 @@
                                   #Adjust Employment using County Controls
                                   curAdjEmp <- sph.AzIp[!(rownames(sph.AzIp) %in% names(Emp.Az)) & (sph.AzIp$County %in% names(Emp.Co)), "AdjustEmp"] 
                                   empFacByCnty <-  empFac.Co[sph.AzIp[!(rownames(sph.AzIp) %in% names(Emp.Az)) & (sph.AzIp$County %in% names(Emp.Co)), "County"]]                
-                                  sph.AzIp[!(rownames(sph.AzIp) %in% names(Emp.Az)) & (sph.AzIp$County %in% names(Emp.Co)), "AdjustEmp"] <- curAdjEmp * empFacByCnty
+                                  # removed this adjustment on 7-19-16 (AB) because this step incorrectly assumes that county level employment projections for the state mean something 
+                                  # since no one is held to them this step can go negative which is not correct, and there is no information availalbe to improve this step, hence just remove it.
+                                  #sph.AzIp[!(rownames(sph.AzIp) %in% names(Emp.Az)) & (sph.AzIp$County %in% names(Emp.Co)), "AdjustEmp"] <- curAdjEmp * empFacByCnty
                                   
                                   rm(Pop.Co, Emp.Co, Pop.CoYr, Emp.CoYr, popFac.Co)      
                                   
@@ -285,8 +301,8 @@
                                                                                  
                                   #Create attraction level control using the user defined disaggregation method
                                   switch(disaggregateMethod,
-                                        "SWIMPCT" = {sph.AzIp$Atr <- sph.AzIp$SWIMPCT 
-                                                     sph.AzIp$AtrFac <- sph.AzIp$SWIMPCT/100 
+                                        "SWIMPCT" = {sph.AzIp$Atr <- (sph.AzIp$AdjustEmp * 2 + sph.AzIp$AdjustPop) 
+                                                     sph.AzIp$AtrFac <- sph.AzIp$Atr / (sph.AzIp$SWIMEMP * 2 + sph.AzIp$SWIMPOP)
                                                      Crosswalk$AtrFac <- Crosswalk$SWIMPCT / 100 },
                                         
                                         "LOCALPOPSHARE" = {sph.AzIp$Atr <- sph.AzIp$AdjustPop 
@@ -417,7 +433,7 @@
                                               TODLst <- list()
                                               for(x in 1:nrow(TOD_periods)) {
                                                     indx1 <-  tripStartTime >= TOD_periods[x,"StartTime"]
-                                                    indx2 <-  tripStartTime < TOD_periods[x,"EndTime"]
+                                                    indx2 <-  tripStartTime <= TOD_periods[x,"EndTime"] # 7-19-16 AB - changed "<" to "<=", which is correct based on the way the input file is defined.
                                                     curTOD  <-  rep("",length(tripStartTime))
                                                     curTOD[indx1&indx2] <-  rep(TOD_periods[x, "Period"],sum(indx1&indx2))
                                                     TODLst[[x]] <- curTOD
@@ -430,6 +446,7 @@
                                             }             
                                   
                                   #Cluster processing     
+                                  options(warn=-1)
                                   cl <- makeCluster(7)
                                   registerDoParallel(cl)
                                   clusterExport(cl,c("TOD_periods"))
@@ -440,6 +457,8 @@
                                   names(outLst) <- NULL               
                                   outDF <- unlist(outLst)
                                   data$TOD <-  outDF 
+                                  gc()
+                                  options(warn=0)
                                 
                                   #Create external tags
                                   data$ext <- "II"
@@ -472,32 +491,6 @@
                     
                                   data$od <- paste(data$origin,data$destination,sep="-")
                                      
-                                  #Get records whose link pcts != 100% 
-                                  temp <- data[data$SELECT_LINK_PERCENT!=1,]
-                                  if(dim(temp)[1] > 1) {
-                                        uniqueLinkPct <- unique(temp$SELECT_LINK_PERCENT)
-                                        #Loop thru each link percent value and compute mean and count
-                                        for (u in 1:length(uniqueLinkPct)) {
-                                              value <- tapply(temp$SELECT_LINK_PERCENT[temp$SELECT_LINK_PERCENT==uniqueLinkPct[u]],temp$od[temp$SELECT_LINK_PERCENT==uniqueLinkPct[u]],mean)
-                                              count <- tapply(temp$SELECT_LINK_PERCENT[temp$SELECT_LINK_PERCENT==uniqueLinkPct[u]],temp$od[temp$SELECT_LINK_PERCENT==uniqueLinkPct[u]],length) 
-                                              #Compute modulus of count and mean 
-                                              r <- round((1 / value)) 
-                                              mod <-  count %% r
-                                              #Report list of o-d pairs for which modulus is not zero (meaning the od link percents doesn't add up to 100%) 
-                                              if(mod > 0) {
-                                                    checkLinkPct <- cbind(count,value, mod)
-                                                    ifelse(exists("all_checkLinkPct"), all_checkLinkPct <- rbind(all_checkLinkPct,checkLinkPct), all_checkLinkPct <- checkLinkPct)
-                                              }
-                                        }    
-                                  }
-                                  rm(temp)
-                                           
-                                  #Write od pairs to a csv file
-                                  if(exists("all_checkLinkPct")){
-                                        write.csv(all_checkLinkPct,"errors_in_trip_list_data.csv",row.names=T)
-                                        rm(all_checkLinkPct,checkLinkPct)
-                                  }
-        
                                   #=================================================================================================
                                   # Fill JEMnR external array with disaggregated SWIM trip information
                                   #=================================================================================================                                                   
@@ -604,7 +597,7 @@
     
     ############################ IPF FUNCTION FOR EXTERNAL MATRICES #####################################
 
-    fun$extIPF <- function(rowcontrol, colcontrol, fullMat, extSta, period, maxiter=50, closure=0.0001){
+    fun$extIPF <- function(rowcontrol, colcontrol, fullMat, extSta, period, maxiter=100, closure=0.0001){
                     #input data checks: sum of marginal totals equal and no zeros in marginal totals
                     #if(sum(rowcontrol) != sum(colcontrol)) stop("sum of rowcontrol must equal sum of colcontrol")
                     if(any(rowcontrol==0)){
@@ -648,7 +641,7 @@
             	            colcheck <- sum(abs(1-colfactor))
             	            iter <- iter + 1
                     }
-                    if(iter == maxiter) cat(paste( "\nThe maximum (", iter, ") number of iterations was reached the externalModel ipf did NOT close for period=", period,"\nSum of abs of Row Differences to Row Controls = ",rowcheck,"\nSum of abs of Col Differences to Col Controls = ", colcheck, "\nClouser Criteria = ", closure, "\n\n",sep=""))
+                    if(iter == maxiter) cat(paste( "\nThe maximum (", iter, ") number of iterations was reached the externalModel ipf did NOT close for period=", period,"\nSum of abs of Row Differences to Row Controls = ",rowcheck,"\nSum of abs of Col Differences to Col Controls = ", colcheck, "\nClosure Criteria = ", closure, "\n\n",sep=""))  # AB 1-23-19, corrected Clouser , 3-13-19 - corrected again, had changed it Closuer, third times the charm
 
                     #Repack the EE, EI, and IE into the full matrix
                     result[extSta, extSta] <- ee
@@ -721,6 +714,15 @@
                                 }
                                 
                                 externals <<- externals[,extNames]    
+                              	
+                              	# 9-19-19 AB - adding extra error checking if have nan
+                              	# Totals are assumed to match well enough if they make it through the ipf process without error - however NAN is a seperate issue
+                             	  emptyHours <- dimnames(ext.ZnZnTdMd)[[3]][is.nan(apply(ext.ZnZnTdMd,3,sum))]                              	                              	
+                              	if(length(emptyHours) > 0){
+                              	   cat(paste("\nThe following hours have zero SWIM demand to base patterns off of:\n", paste(emptyHours, collapse="\n"),"\n",sep=""))
+                              	   cat(paste("\nA total coded demand of,",round(sum((externals$daily_truck+externals$daily_auto)  *t(externals[,emptyHours]))),"vehicles was coded for those hours but is now zero\nsince SWIM has no demand to base trends off of.\n"))
+                                   ext.ZnZnTdMd[is.nan(ext.ZnZnTdMd)] <-0
+                              	}
                               	
                               	# export the external information being used in the run 
                               	save(ext.ZnZnTdMd, file=paste(storeLoc, "externalOD_ZnZnTdMd.RData", sep=""))

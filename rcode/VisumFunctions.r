@@ -9,6 +9,9 @@
 #:Updated - 9/18/2014 by Alex Bettinardi to work with VISUM 14
 #:Updated - 1/5/16 by Alex Bettinardi to work with VISUM 15
 #:Updated - 1/13/16 by Alex Bettinardi to properly point project directories to the gpa and par locations
+#:Updated - 1/8/17 by Alex Bettinardi to block meaningless warnings and messages when loading libraries - rcom
+#:Updated - 10/22/18 by Alex Bettinardi to work with Visum 18
+#:Updated - 12/5/18 by Alex Bettinardi to remove the "POOP" reference 
 #:Copyright: 2009, Oregon Department of Transportation
 #:License: GPL2
 # This program is free software; you can redistribute it and/or
@@ -34,7 +37,9 @@
 # 
 
 # load library 
-library(rcom)
+options(warn=-1)
+suppressMessages(library(rcom))
+options(warn=0)
 # and set ODOT license
 try(comSetLicenseInfo("R","ODoT"), silent=T)  
 
@@ -93,7 +98,7 @@ if(!exists("vVer")) vVer <- 15
                   listType <- c("CreateZoneList","CreateLinkList","CreateConnectorList","CreateNodeList")                               
                   listObj <- comGetProperty(comGetProperty(visObj,"Lists"), listType[index])
                   comInvoke(listObj, "Show")          
-                  sapply(c(fields,"poop"),function(x)comInvoke(listObj, "AddColumn", toupper(x)))
+                  sapply(fields,function(x)comInvoke(listObj, "AddColumn", toupper(x)))   # 12-5-18 AB, removed the "poop" reference
                   SFA <- comInvoke(listObj,"SaveToArray")
                   listObj <- NULL
                   rm(listObj)
@@ -195,7 +200,10 @@ if(!exists("vVer")) vVer <- 15
     #NOTE:
     VisFun$getMatList <- function(visObj) {
                   matList_ <- list()
-                  for(matType in c("ODMatrices", "SkimMatrices","DemandSegments")) {
+                  matList. <- c("ODMatrices", "SkimMatrices","DemandSegments")  # AB 10-22-18 list changed from Visum 16 to 18
+                  if(!exists("vVer")) vVer <- 16 # AB 10-22-18 Updated to work with Visum 18
+                  if(vVer > 17) matList. <- c("Matrices","DemandSegments") 
+                  for(matType in matList.) {
                       MatObj <- comGetProperty(comGetProperty(visObj,"Net"),matType)
                       if(matType == "DemandSegments"){
                          temp <- do.call(cbind, lapply(c("CODE","NAME"),function(x)comGetProperty(MatObj,"GetMultiAttValues",x)[,2]))
@@ -215,8 +223,10 @@ if(!exists("vVer")) vVer <- 15
     #OUTPUT: An OD Matrix          
     #NOTE:
     VisFun$getODMatrix <- function(visObj, matNum) {
-	                MatObj <- comGetProperty(comGetProperty(comGetProperty(visObj,"Net"),"ODMatrices"),"ItemByKey",matNum)                
-	                mat = comInvoke(MatObj, "GetValues")
+                  if(!exists("vVer")) vVer <- 16 # AB 10-22-18 Updated to work with Visum 18
+                  MatInd <- ifelse(vVer>17,"Matrices","ODMatrices") # AB 10-22-18 Updated to work with Visum 18
+                  MatObj <- comGetProperty(comGetProperty(comGetProperty(visObj,"Net"),MatInd),"ItemByKey",matNum)                	                
+                  mat = comInvoke(MatObj, "GetValues")
 	                mat = matrix(unlist(mat),sqrt(length(mat)),sqrt(length(mat)))
 	                zone = comGetProperty(vbConv("Visum.Net"), "Zones")
                   rownames(mat) <- colnames(mat) <- comGetProperty(zone, "GetMultiAttValues", "NO")[,2] 
@@ -229,7 +239,9 @@ if(!exists("vVer")) vVer <- 15
     #OUTPUT: none
     #NOTE:
     VisFun$setODMatrix <- function(visObj, matNum, inMat) {
-                  MatObj <- comGetProperty(comGetProperty(comGetProperty(visObj,"Net"),"ODMatrices"),"ItemByKey",matNum)
+                  if(!exists("vVer")) vVer <- 16 # AB 10-22-18 Updated to work with Visum 18
+                  MatInd <- ifelse(vVer>17,"Matrices","ODMatrices") # AB 10-22-18 Updated to work with Visum 18
+                  MatObj <- comGetProperty(comGetProperty(comGetProperty(visObj,"Net"),MatInd),"ItemByKey",matNum)
 	                inMat = as.list(inMat)
 	                dim(inMat) <- rep(sqrt(length(inMat)),2)
                   comInvoke(MatObj,"SetValues", inMat)
@@ -241,7 +253,9 @@ if(!exists("vVer")) vVer <- 15
     #OUTPUT: A Skim Matrix   
     #NOTE:
     VisFun$getSkimMatrix <- function(visObj, matNum) {
-	                MatObj <- comGetProperty(comGetProperty(comGetProperty(visObj,"Net"),"SkimMatrices"),"ItemByKey",matNum)                
+                  if(!exists("vVer")) vVer <- 16 # AB 10-22-18 Updated to work with Visum 18
+                  MatInd <- ifelse(vVer>17,"Matrices","SkimMatrices") # AB 10-22-18 Updated to work with Visum 18	                
+                  MatObj <- comGetProperty(comGetProperty(comGetProperty(visObj,"Net"),MatInd),"ItemByKey",matNum)                
 	                mat = comInvoke(MatObj, "GetValues")
 	                mat = matrix(unlist(mat),sqrt(length(mat)),sqrt(length(mat)))
 	                zone = comGetProperty(vbConv("Visum.Net"), "Zones")
@@ -255,7 +269,9 @@ if(!exists("vVer")) vVer <- 15
     #OUTPUT: none
     #NOTE:
     VisFun$setSkimMatrix <- function(visObj, matNum, inMat) {
-                  MatObj <- comGetProperty(comGetProperty(comGetProperty(visObj,"Net"),"SkimMatrices"),"ItemByKey",matNum)
+                  if(!exists("vVer")) vVer <- 16 # AB 10-22-18 Updated to work with Visum 18
+                  MatInd <- ifelse(vVer>17,"Matrices","SkimMatrices") # AB 10-22-18 Updated to work with Visum 18                  
+                  MatObj <- comGetProperty(comGetProperty(comGetProperty(visObj,"Net"),MatInd),"ItemByKey",matNum)
 	                inMat = as.list(inMat)
 	                dim(inMat) <- rep(sqrt(length(inMat)),2)
                   comInvoke(MatObj,"SetValues", inMat)
@@ -281,7 +297,14 @@ if(!exists("vVer")) vVer <- 15
                   comObj <- comGetProperty(comObj,"DemandSegments")
                   ds <- comGetProperty(comObj, "ItemByKey", dsName)
                   dsmat <- comGetProperty(ds, "ODMatrix")
-                  matNum <- as.numeric(getMatList(visObj)$ODMatrices[getMatList(visObj)$ODMatrices[,"CODE"]==matCode,"NO"])
+                  # AB 10-22-18 Updated to work with Visum 18
+                  matList_ <- getMatList(visObj)
+                  if(!exists("vVer")) vVer <- 16
+                  if(vVer>17){
+                     matNum <- as.numeric(matList_$Matrices[matList_$Matrices[,"CODE"]==matCode,"NO"])
+                  } else {
+                     matNum <- as.numeric(matList_$ODMatrices[matList_$ODMatrices[,"CODE"]==matCode,"NO"])
+                  }
                   inMat <- getODMatrix(visObj,matNum)
                   inMat <- TabletoSFA(inMat)
                   comInvoke(dsmat, "SetValues", inMat)		

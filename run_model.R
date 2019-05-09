@@ -1,5 +1,5 @@
 # run_model.R
-# Code Base (C) 2.2: 6-1-16 (AB)
+# Code Base (C) 2.8: 12-5-18 (AB)
 
 # This script controls the overall running of the small urban area model
 
@@ -13,6 +13,8 @@
 # Updated: 12/16/2015 Alex Bettinardi for Visum 15
 # Updated: 4/13/2016 Alex Bettianrdi to allow for the "data" folder to be specified prior to Model_Inputs.R and future_hhs.R, additionally a series of if statements were added to run the visitor model
 # Updated: 6/1/16 Alex Bettinardi - corrected spelling of "vistorModel" due to edits needs in trip_distribution.r
+# Updated: 10/26/16 Alex Bettinardi - Updated OSUM to Visum 16 and R 3.3.1
+# Updated: 12/5/18 Alex Bettinardi - Updated OSUM 2.8 to Visum 18 and R 3.5.1
 
 # Copyright (C) 2002  Oregon Department of Transportation
 # This program is free software; you can redistribute it and/or
@@ -37,7 +39,7 @@ rm(list=ls(all=TRUE))
 source("rcode\\load_model_functions.R")
 
 # Define the Visum version to be used - AB, 12-16-15
-vVer <- 15 # The current release of OSUM uses Visum 15 
+vVer <- 18 # The current release of OSUM uses Visum 15, AB as of 12-5-18 OSUM 2.8 is Visum 18.
 
 # load and open VISUM connection
 Visum <- getFile()

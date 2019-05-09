@@ -1,5 +1,5 @@
 # load_model_functions.R
-# Code Base (C) 2.1: 3-7-16 (AB)
+# Code Base (C) 2.8: 10-22-18 (AB)
 
 # This file loads a number of basic functions to make model operations easier
 # Created: 10/24/02, Brian Gregor, brian.j.gregor@odot.state.or.us
@@ -11,6 +11,9 @@
 # Updated: 04/10/2013, Alex Bettinardi
 # Updated: 08/26/2015, Alex Bettinardi
 # Updated: 02/11/2016, Alex Bettinardi
+# Updated: 10/26/2016, Alex Bettinardi
+# Updated: 5/24/2018, Alex Bettinardi
+# Updated: 10/22/2018, Alex Bettinardi
 
 # Copyright (C) 2002  Oregon Department of Transportation
 # This program is free software; you can redistribute it and/or
@@ -53,6 +56,13 @@
 #   Added an option required in Astoria's setup for the user to set the factor applied to the closest zone to determine intrazonal travel time.    
 # 02/11/16 - Alex Bettinardi
 #   Adding in the option to have terminal time apply to intrazonal trips
+# 10/26/16 - Alex Bettinardi
+#   Updated the call to the "calcTT.par" file to "calcTT.xml" due to the format change in Visum 16.
+# 5/24/18 - Alex Bettinardi
+#   Updated the timeterm calculation in dist.prob to correctly reference the purpose
+#   Updated the "cat" print state in severLocalSource to correct spelling errors and to clairfy certain aspects
+# 10/22/18 - Alex Bettinardi
+#   Updated save.TT to work with Visum 18+
 
 # load libraries
 if(!any(search()=="package:tcltk")) {
@@ -71,7 +81,8 @@ serverLocalSource <- function(Server, Local) {
       # see if the "traveling copy" (Local) needs to be updated
       Old <- paste(readLines(Local), collapse="\n")
       New <- paste(readLines(Server), collapse="\n")
-      if(Old != New) cat(paste("\n\nThe Server script at -", Server, "\nis different than the Local script at -", Local, "\nThe Server Script was used in this run\n\nHowever, if you ever run this model application off the server you will not be\nusing the latest scrip.  It is strongley recomended that you take\na minute or two at this time and update your local copy with the server copy\n\nServer:", Server, "\nLocal:",Local, "\n\n"))
+      # 5-24-18 AB - updated print statement spelling errors and lanuage that needed improvement
+      if(Old != New) cat(paste("\n\nThe Server script at -", Server, "\nis different than the Local script at -", Local, "\nThe Server Script was used in this run\n\nHowever, if you ever run this model application without access to the server\nyou will not be using the latest script.  It is strongly recommended that you take\na minute or two at this time and update your local copy with the server copy\n\nServer:", Server, "\nLocal:",Local, "\n\n"))
       rm(Old, New)       
       source(Server)        
    } else {
@@ -207,7 +218,7 @@ osumFun$dist.prob <- function(travtime, purpose, size.c=size.coeff, time.c=time.
     sizeterm <- log(rowSums(sweep(size.v, 2, size.c[purpose,], "*")))
     bias <- expand.vector(district.b[[purpose]], taz.data$taz, taz.data$district, 0)
     sizeterm <- sizeterm+log(bias)
-    time.adj <- global.t * expand.matrix(district.t, taz.data$taz, taz.data$district, 1)
+    time.adj <- global.t[purpose] * expand.matrix(district.t, taz.data$taz, taz.data$district, 1)  # 5-24-18 AB - added [purpose] to correctly index the global.t vector
     travtime <- travtime * time.adj
     time.coeff.vec <- time.c[purpose,]
     timeterm <- time.coeff.vec[1]*travtime + time.coeff.vec[2]*travtime^2 + time.coeff.vec[3]*travtime^3
@@ -237,13 +248,19 @@ osumFun$save.TT <- function(pkHr, init=F) {
    } else {
       setDSegMatrix(Visum, aMode, trip.dist$hourly.vehicles[,,pkHr])
    }
-   comInvoke(vbConv("Visum.Procedures"), "Open", paste(getwd(), "ParameterFiles/calcTT.par", sep="/"))
+   comInvoke(vbConv("Visum.Procedures"), "Open", paste(getwd(), "ParameterFiles/calcTT.xml", sep="/"))
    comInvoke(vbConv("Visum.Procedures"), "Execute")
    
    TT2NEARESTZONEFACTOR <- ifelse(is.null(comGetProperty(vbConv("Visum.Net"), "AttValue", "TT2NEARESTZONEFACTOR")),0.5, comGetProperty(vbConv("Visum.Net"), "AttValue", "TT2NEARESTZONEFACTOR"))
    
   #offpeak period travel times
-    offpk.time <- getSkimMatrix(Visum, as.numeric(matrices$SkimMatrices[matrices$SkimMatrices[,"CODE"]=="TT0","NO"]))
+    if(vVer>17){ # AB 10-22-18 Updated to work with Visum 18
+       offpk.time <- getSkimMatrix(Visum, as.numeric(matrices$Matrices[matrices$Matrices[,"CODE"]=="TT0","NO"]))
+       pk.time <- getSkimMatrix(Visum, as.numeric(matrices$Matrices[matrices$Matrices[,"CODE"]=="TTC","NO"]))
+    } else {
+       offpk.time <- getSkimMatrix(Visum, as.numeric(matrices$SkimMatrices[matrices$SkimMatrices[,"CODE"]=="TT0","NO"]))
+       pk.time <- getSkimMatrix(Visum, as.numeric(matrices$SkimMatrices[matrices$SkimMatrices[,"CODE"]=="TTC","NO"]))
+    }
     Diag <- apply(offpk.time, 1, function(x) TT2NEARESTZONEFACTOR * min(x[x != 0]))
     offpk.time <- offpk.time + terminalTime
     if(!is.null(comGetProperty(vbConv("Visum.Net"), "AttValue", "TT2INTRAZONAL"))){  # AB 2-11-16 New option to allow Terminal time to be added to intrazonal
@@ -251,7 +268,6 @@ osumFun$save.TT <- function(pkHr, init=F) {
     }
     diag(offpk.time) <- Diag
   #peak period travel times
-    pk.time <- getSkimMatrix(Visum, as.numeric(matrices$SkimMatrices[matrices$SkimMatrices[,"CODE"]=="TTC","NO"]))
     Diag <- apply(pk.time, 1, function(x) TT2NEARESTZONEFACTOR * min(x[x != 0]))
     pk.time <- pk.time + terminalTime
     if(!is.null(comGetProperty(vbConv("Visum.Net"), "AttValue", "TT2INTRAZONAL"))){  # AB 2-11-16 New option to allow Terminal time to be added to intrazonal

@@ -1,5 +1,5 @@
 # inputCheck.R
-# Code Base (C) 2.2.1: 4-25-16 (AB)
+# Code Base (C) 2.8.1: 11-16-18 (AB)
 
 # author Alex Bettinardi
 # version 2.0
@@ -13,6 +13,12 @@
 # Revised 4-1-16 AB,  realized that the user has to code both the "NO" and "TAZ" field when adding a zone.
 #                     Building in a check to double check that those fields are identical.
 # Revised 4-25-16 AB, Adding a check to verify that Total employment is always greater than retl + serv
+# Revised 8-29-17 AB, Adding a check to see if any zones have blank data for any fields
+# Revised 9-14-17 AB, Fixing check made on 8-29-17, to leave out bgbase
+# Revised 1-16-18 AB, The employment check for V2 was under the V1 if statement, that has been corrected with an "else" timestamped below.
+# Revised 1-31-18 AB, Added just a line to review the diurnal and the directional balance.
+# Revised 6-7-18 AB,  Updated so that links with C,W would be evaulated in the network check, not just "C"
+# Revised 11-16-18 AB, Updated to check to make sure that link length is the same in both directions
 #
 ######################################################
 # Checks Inputs for Coding Errors and Inconsitentcies.
@@ -98,15 +104,24 @@ if(any(rowSums(taz.data[,paste(c("agri", "indy", "retl", "serv", "educ", "govt",
    ePopUp(c("Total Emp and Emp-by-Industry don't match for these Zones", taz.data$taz[rowSums(taz.data[,paste(c("agri", "indy", "retl", "serv", "educ", "govt", "othr"),scenario, sep="")])!= taz.data[,paste("emp", scenario, sep="")]]))
 }
 
+} else { # 1-16-18 AB 
+
 # Warning if total employment is less than retl + serv - 4-25-16
 if(any(rowSums(taz.data[,paste(c("retl", "serv"),scenario, sep="")]) > taz.data[,paste("emp", scenario, sep="")])) {
    ePopUp(c("Total Emp is less than retl+serv for these Zones", taz.data$taz[rowSums(taz.data[,paste(c("retl", "serv"),scenario, sep="")])> taz.data[,paste("emp", scenario, sep="")]]))
 }
-
 }
+
 # Warning if districts and district.bias don't match
 if(any(sort(unique(taz.data$district)) != sort(as.numeric(names(district.bias[[1]]))))){
    ePopUp(c("Districts coded in taz.data don't match dist.bias input", "taz.data", unique(taz.data$district), "dist.bias", sort(as.numeric(names(district.bias[[1]])))))
+}
+
+# Add hard stop if any of the taz fields are not numeric,
+# which implies that there are any blanks in the taz fields - 8-29-17 AB
+if(any(!sapply(names(taz.data)[names(taz.data) != "bgbase"],function(x) is.numeric(taz.data[,x])))){  # 9-14-17 AB, changed so that bgbase not reviewed
+   stop(paste("The field(s):\n",names(taz.data)[!sapply(names(taz.data),function(x) is.numeric(taz.data[,x]))],
+              "\nis a (are) non-numeric field(s).\nThis typically occurs because of a blank record\ntypically introduced for an external zone(s).\nGo back and check your zone inputs for the fields identified above.\nSave your version file after correcting any issues and try re-running OSUM."))
 }
 
 # Warning to give user warning that not enough employment (or HH or sche) is availalbe for Spec Gen
@@ -127,14 +142,36 @@ if(exists("spec.gen")){
    }
    rm(SpecEmpCheck,tz)
 }
+
+# check that diurnal and directional balance - at this point just a manual saved check, not fully implmented 1-31-18 AB
+eD <- directional
+dirNames <- sapply(colnames(eD), function(x) substring(x, 1,nchar(x)-2))
+Adj <- 0.5/colSums(diurnal[,dirNames]*eD)
+names(Adj) <- names(dirNames)
+iter <- 0
+if(any(abs(Adj-1) > 0.03)){
+   ePopUp(c("Your direction file is not in daily balance with your diurnal file.",paste0("It is off by a max of: ", round(max(abs(Adj-1))*100),"%"), "A new directional file has been cacluated and is avaiable for you to consider, see -","balanced_directional.csv"))
+   while(iter<100 & any(abs(Adj-1) > 0.01)) {
+      eD <- sweep(eD,2,Adj,"*")
+      for(purpose in colnames(diurnal)){
+         eD[,dirNames==purpose] <- round(eD[,dirNames==purpose]/rowSums(eD[,dirNames==purpose]),4)
+      }
+      iter <- iter + 1
+      Adj <- 0.5/colSums(eD*diurnal[,dirNames])
+   }
+   write.csv(eD,"balanced_directional.csv")
+}
+rm(dirNames, Adj,eD, iter)
+
+
 # set of network checks for OSUM V2
 if(exists("getAttTable")){
    # Get network information to check
-   Net.. <- getAttTable(Visum,"Links",c("NO","FROMNODENO", "TONODENO", "TSYSSET", "NUMLANES", "CAPPRT", "V0PRT", "PLANNO"),initalFilter=T)
+   Net.. <- getAttTable(Visum,"Links",c("NO","FROMNODENO", "TONODENO", "TSYSSET", "NUMLANES", "CAPPRT", "V0PRT", "PLANNO", "LENGTH"),initalFilter=T) # 11-16-18 AB - added Length to the network table pull
    Net..$Mode <- as.character(Net..$TSYSSET)
    Net..$Cap <- Net..$CAPPRT / Net..$NUMLANES
    Net..$Cap[is.nan(Net..$Cap)] <- 0
-   Net.. <- Net..[Net..$Mode == aMode,]
+   Net.. <- Net..[grep(aMode, Net..$Mode),]  # 6-7-18, updated so that it will review all links with "C", like adding "C,W", no longer requires just a "C" to be coded. 
    Net..$LinkID <- paste(Net..$NO,": ", Net..$FROMNODENO, "-", Net..$TONODENO, ": ", Net..$PLANNO, ", ", Net..$NUMLANES, ", ", Net..$Cap, ", ", Net..$V0PRT, sep="")
    Net..$Flag <- (Net..$V0PRT > 0) & (Net..$Cap == 0) 
    if(sum(Net..$Flag)>0){
@@ -182,13 +219,21 @@ if(exists("getAttTable")){
       ePopUp(c("The Following Links have a capacity that is outside the OSUM defined range", "See: \\Instructions\\  Attribution_ReferenceSheet.xls", "Link #: FromNode-ToNode: Functional Class, #Lanes, Per Lane Capacity, MPH", Net..$LinkID[Net..$Flag]))   
    }
    
+   # 11-16-18 AB Check that link lengths are coded the same in both directions    
+   LenDif. <- unlist(tapply(Net..$LENGTH, Net..$NO, diff))
+   LenDif. <- LenDif.[LenDif. != 0]
+   if(length(LenDif.)>0){
+      Net..$Flag <- Net..$NO %in% as.numeric(names(LenDif.))
+      ePopUp(c("The Following Links have a different link length in each direction", "Link #: FromNode-ToNode: Length", paste(Net..$NO,": ", Net..$FROMNODENO, "-", Net..$TONODENO, ": ", Net..$LENGTH, sep="")[Net..$Flag]))         
+   }
+   
    # 4-1-16 Check that "NO" and "TAZ" zone fields are identical, required
    Zone.. <- getAttTable(Visum,"Zones",c("NO","TAZ"),initalFilter=T)
    Check <- Zone..$NO != Zone..$TAZ
    if(sum(Check)>0){
       ePopUp(c("The TAZ field and the NO Field do not match (required) for Following Zones",Zone..$NO[Check]))
    }
-   rm(Net.., upperLimit, lowerLimit, Zone.., Check)
+   rm(Net.., upperLimit, lowerLimit, Zone.., Check, LenDif.)
 }
 
 

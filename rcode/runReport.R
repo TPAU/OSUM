@@ -1,5 +1,5 @@
  # runReport.R
- # Code Base (C) 2.1.0: 3-7-16 (AB)
+ # Code Base (C) 2.8.4: 12-12-18 (AB)
  #============ 
  #**Author:** Alex Bettinardi (AB) 
  #**Contact:** alexander.o.bettinardi@odot.state.or.us  
@@ -12,6 +12,20 @@
  # 2/10/2014 AB - updated to plot travel time distribution for all trips (previously, just by the 5 purposes, now there is a "total" plot)
  # 3/5/2014 AB - corrected minor text issue in diurnal plotter 
  # 2/11/2016 AB - Added a plot for intrazonal demand vs total OD demand
+ # 12/21/2016 AB - Adding workers to Employment ratio
+ # 5/2/2017 PS - Updated spelling errors
+ # 1/10/2018 AB - Based on Martin Recomendation - adding household size distribution and resulting population total comparison 
+ # 1/16/2018 AB - Corrected plotting error
+ # 3/29/2018 AB - Added Date and current model directory to html header - cleaned up Trip Geneartion Summary Plot
+ # 4/2/2018 AB - Added in a plot (visualization) of the time coefficent utility curves - note, not current added to the html -just a side plot of interest 
+ # 5/23/18 AB - Changed the current model directory in the header of the Html. Previously it was just a directory for the current OSUM run, now it calls out the Version file as well.
+ # 5/26/18 AB - Remove DesireableError.png plot from html - it's not a helpful plot
+ #            - Adding scatter plots by functional class
+ #            - added VMT / VHT plot
+ # 6-7-18 AB - Corrected VMT volumes to correctly pull reference volumes for the total VMT and to pull VMT/VHT from all links (not just the common links between the two scenarios)
+ # 6-11-18 AB - Martin helped track down an indexing error in the VMT / VHT plotter.
+ # 11-14-18 AB - Added a warning if the user has not cleared the errorReport.txt file
+ # 12-12-18 AB - Correct title issue for the Household distribution by Worker Size
 
 # First load opitional libraries for html tables:
    options(warn=-1)
@@ -49,21 +63,59 @@ Png <- list(Width=1000, Height=1200, Res = 150)
      ref <- ref
      rm(refData, assignWorkSpace)
 
- # Plot trip generation plots
+ # Plot worker distribution plots
  #================================================
 
      # set up plotting device
-     png(paste(reportFolder, "TripGen.png", sep="/"), width=Png$Width, height=Png$Height, res=Png$Res)
+     png(paste(reportFolder, "WorkerDist.png", sep="/"), width=Png$Width, height=Png$Height, res=Png$Res)
 
-     layout(matrix(1:2, byrow=TRUE, ncol=1))
+     layout(matrix(1:3, byrow=TRUE, ncol=1))
      par(mar=c(2,4.1,4.1,2.1), oma=c(2,2,2,2))
 
      # Check Work Distribution Results
      x=barplot(rbind(Current=apply(hh.wkr.dist,2,sum), Reference=apply(ref$hh.wkr.dist,2,sum)), beside=T, col=c("white", "grey"), legend.text=T,
-             main="Comparison of Number of Workers per Household Between", ylab="Total Households")
+             main="Comparison of Household Distribution by Workers", ylab="Total Households")  # Title updatd 12-12-18 AB
      abline(h=0)
      text(x, rbind(Current=apply(hh.wkr.dist,2,sum), Reference=apply(ref$hh.wkr.dist,2,sum)), round(rbind(Current=apply(hh.wkr.dist,2,sum), Reference=apply(ref$hh.wkr.dist,2,sum))), cex=0.8, pos=1)      
 
+     x <- c(sum(t(hh.wkr.dist)*0:3), sum(taz.data$empbase))
+     y <- c(sum(t(ref$hh.wkr.dist)*0:3), sum(ref$taz.data$empbase))
+     names(x) <- names(y) <- c("Total Workers", "Total Emp") 
+
+     y <- rbind(Current=x, Reference=y)
+     x=barplot(y, beside=T, col=c("white", "grey"), legend.text=T,
+             main="Comparison of Workers to Employment Ratio", ylab="Workers to Jobs", args.legend=list(x="bottomleft"))
+     text(x, y, round(y), cex=0.8, pos=1)
+     text(mean(x), max(y)*.7, paste("Workers\nto Jobs\nRatio\n",paste(c("Current =", "Reference ="), round(y[,1]/y[,2],2), collapse="\n"),sep=""), cex=0.8, pos=1)      
+     
+  # Plot household size distribution plots 1/10/18 AB - happy birthday mom
+ #================================================
+ 
+     # Check Work Distribution Results
+     x=barplot(rbind(Current=apply(hh.size.dist,2,sum), Reference=apply(ref$hh.size.dist,2,sum)), beside=T, col=c("white", "grey"), legend.text=T,
+             main="Comparison of Household Size Totals", ylab="Total Households")
+     abline(h=0)
+     text(x, rbind(Current=apply(hh.size.dist,2,sum), Reference=apply(ref$hh.size.dist,2,sum)), round(rbind(Current=apply(hh.size.dist,2,sum), Reference=apply(ref$hh.size.dist,2,sum))), cex=0.8, pos=1)      
+
+     # legend text for population size assuming 4 people in the household size 4
+     legend("bottomleft",paste(c("Cur", "Ref"),round(c(sum(t(hh.size.dist)*1:4),sum(t(ref$hh.size.dist)*1:4))),
+                               round(c(sum(t(hh.size.dist)*c(1:3,5)),sum(t(ref$hh.size.dist)*c(1:3,5)))), sep=" - "),                 
+       title="Population Range Est",bg="white")
+     legend("bottom",paste(c("Cur", "Ref"),round(c(sum(t(hh.size.dist)*1:4)/sum(hh.size.dist),sum(t(ref$hh.size.dist)*1:4)/sum(ref$hh.size.dist)),2),
+                               round(c(sum(t(hh.size.dist)*c(1:3,5))/sum(hh.size.dist),sum(t(ref$hh.size.dist)*c(1:3,5))/sum(ref$hh.size.dist)),2), sep=" - "),                 
+       title="Avg HH Size Range",bg="white")
+
+     dev.off()
+     rm(x,y)     
+
+ # Plot trip generation plots
+ #================================================
+
+     # set up plotting device
+     png(paste(reportFolder, "TripGen_Orig.png", sep="/"), width=Png$Width, height=Png$Height/2, res=Png$Res)   # AB 3/26/18 changed this to original because of replacment below
+     layout(matrix(1:1, byrow=TRUE, ncol=1))
+     par(mar=c(2,4.1,4.1,2.1), oma=c(2,2,2,2))
+     
      # Plot Trip Generation Summary Results
      x=barplot(rbind(Current=trip.prod$trip.data, Reference=ref$trip.prod$trip.data), beside=T, col=c("white", "grey"), legend.text=T,
              main="Trip Generation Summary Results", ylab="Measure")
@@ -72,7 +124,51 @@ Png <- list(Width=1000, Height=1200, Res = 150)
      mtext("Trip Generation Summaries", side=3, line=0, outer=TRUE, cex=1.25)    
      
      dev.off()
-     rm(x)  
+     
+     # AB 3/26/18  - Added a new version of the plot to spell out the analysis a little bit better
+ 
+     png(paste(reportFolder, "TripGen.png", sep="/"), width=Png$Width, height=Png$Height/2, res=Png$Res/2)
+     layout(matrix(1:2, ncol=2))
+     par(mar=c(2,4.1,4.1,2.1), oma=c(2,2,2,2))
+     
+     y <- trip.prod$trip.data[3:5]
+     y <- c(y,sum(y))
+     z <- hh.trip.rate * sum(taz.data$hhbase) 
+     names(y) <- c("Trip Rate\nProduction","Spec Gen\nProduction","I-E Trip\nContribution", "Total Internal\nProduction")
+     x <- barplot(y, col="white", main="Current Scenario", ylab="Total Trip Production", ylim=c(0,1.25*max(c(y,z))))
+     text(x, y[4]*0.1, round(y), pos=2, srt=270, cex=c(1,1,1,2), col=c(rep("black",3),"red"))
+     text(1.25*1:3,y[4]*0.1,c("+","+","="),cex=4,pos=3)
+     abline(h=0)
+     abline(h=z,col="red",lwd=2,lty=2)
+     text(x,z*1.05,c(hh.trip.rate, "*", paste(round(sum(taz.data$hhbase)),"="),round(z)),cex=c(1,3,1,2),col=c(rep("black",3),"red"))
+     text(x,z*1.15,c("HH Trip\nRate", "", "Total HH","Min Trip\nProduction"),cex=c(1,3,1,1))
+     if(z>y[4]){
+        text(2.5,z*0.5,paste(round(z),">",round(y[4]),"\nBoosting\nRequried"),cex=2,col="red")
+     } else {                                          
+        text(2.5,y[4]*0.5,paste(round(z),"<",round(y[4]),"\nNo Boosting\nAdded"),cex=2,col="red")
+     }
+
+     y <- ref$trip.prod$trip.data[3:5]
+     y <- c(y,sum(y))
+     z <- ref$hh.trip.rate * sum(ref$taz.data$hhbase) 
+     names(y) <- c("Trip Rate\nProduction","Spec Gen\nProduction","I-E Trip\nContribution", "Total Internal\nProduction")
+     x <- barplot(y, col="white", main="Reference Scenario", ylab="Total Trip Production", ylim=c(0,1.25*max(c(y,z))))
+     text(x, y[4]*0.1, round(y), pos=2, srt=270, cex=c(1,1,1,2), col=c(rep("black",3),"red"))
+     text(1.25*1:3,y[4]*0.1,c("+","+","="),cex=4,pos=3)
+     abline(h=0)
+     abline(h=z,col="red",lwd=2,lty=2)
+     text(x,z*1.05,c(ref$hh.trip.rate, "*", paste(round(sum(ref$taz.data$hhbase)),"="),round(z)),cex=c(1,3,1,2),col=c(rep("black",3),"red"))
+     text(x,z*1.15,c("HH Trip\nRate", "", "Total HH","Min Trip\nProduction"),cex=c(1,3,1,1))
+     if(z>y[4]){
+        text(2.5,z*0.5,paste(round(z),">",round(y[4]),"\nBoosting\nRequried"),cex=2,col="red")
+     } else {                                          
+        text(2.5,y[4]*0.5,paste(round(z),"<",round(y[4]),"\nNo Boosting\nAdded"),cex=2,col="red")
+     }
+     mtext("Trip Generation Summaries", side=3, line=0, outer=TRUE, cex=1.25)
+     dev.off()
+     rm(x,y,z)  
+     
+     
      
 
  # Plot Intrazonal vs total demand by purpose
@@ -222,7 +318,7 @@ Png <- list(Width=1000, Height=1200, Res = 150)
      
      # Plot Hourly distribution
      png(paste(reportFolder, "HourlyDist.png", sep="/"), width=Png$Width, height=Png$Height, res=Png$Res)
-     plot(1:24,apply(trip.dist$hourly.vehicles,3,sum),type="l",lty=1, col="black", xlab="Hour", ylab="Hourly Vehicle Totals", main="Hourly Distribtuion Comparison")
+     plot(1:24,apply(trip.dist$hourly.vehicles,3,sum),type="l",lty=1, col="black", xlab="Hour", ylab="Hourly Vehicle Totals", main="Hourly Distribution Comparison")
      lines(1:24,apply(ref$trip.dist$hourly.vehicles,3,sum),lty=2, col="grey")
      abline(v=pkHr,lty=1,col="black")
      abline(v=ref$pkHr,lty=2,col="grey")
@@ -246,6 +342,12 @@ Png <- list(Width=1000, Height=1200, Res = 150)
      link..[,5:6] <- ref$Link..[rownames(link..),c(paste("VOL", hourNames[pkHr], hourNames[pkHr+1], sep="_"), "DAILY_VOLUME")]
      names(link..) <- c("FC", "Length", "PkVol", "DailyVol", "PkRef", "DailyRef")
      
+     # 5-26-18 AB adding the addition of Tcur if it exists for both current and reference
+     if(!is.null(Link..$TCUR) & !is.null(ref$Link..$TCUR)){
+         link..$TCUR <- Link..[rownames(link..), "TCUR"]
+         link..$TREF <- ref$Link..[rownames(link..), "TCUR"]
+     } 
+     
      # clean FC if needed
      link..$FC[!(link..$FC %in% c(1:5,30))] <- 0
      
@@ -256,17 +358,40 @@ Png <- list(Width=1000, Height=1200, Res = 150)
  #-----------------------------------
  if(nrow(link..) > 0){ # if statement in case last network had a different network
      # set up plotting device
-     png(paste(reportFolder, "LinkScatter.png", sep="/"), width=Png$Width, height=Png$Height, res=Png$Res)
-     # Set up 1 X 2 plot layout
-     layout(matrix(1:2, byrow=TRUE, ncol=1))
+     png(paste(reportFolder, "LinkScatter.png", sep="/"), width=Png$Width*1.5, height=Png$Height*1.5, res=Png$Res*.75)
+     # Set up 4 X 4 plot layout
+     layout(matrix(1:16, byrow=TRUE, ncol=4))
      # Change inner and outer margins
      par(mar=c(5,4.1,2.1,2.1), oma=c(0,0,2,0))
      
      # turn off plotting warnings
      options(warn=-1)
 
+     # 5-26-18  revising to plot by FC
+     FC <- c("Interstate", "Principal Arterial", "Minor Arterial","Collector", "Local", "Ramps", "No FC Coded")
+     names(FC) <- c(1:5,30, 0)
+     
+     for(fc in names(FC)){
+
+        ind <- as.character(link..$FC)==fc
+        if(sum(ind)==0) {
+            plot(c(-10000,max(link..$DailyVol*2)), c(-10000,max(link..$DailyVol*2)),
+               type="l", xlab="Reference Daily Volume", ylab="Current Daily Volume", main=paste(FC[fc],"- Daily Comparison"))
+        } else {
+            plot(link..$DailyRef[ind],link..$DailyVol[ind], xlim=c(0,max(link..$DailyVol[ind])),ylim=c(0,max(link..$DailyVol[ind])),
+               xlab="Reference Daily Volume", ylab="Current Daily Volume", main=paste(FC[fc],"- Daily Comparison"))
+            reglink <- summary(lm(link..$DailyVol[ind]~link..$DailyRef[ind]))
+            text( 0, max(link..$DailyVol[ind])*.9,
+               paste("y =", round(reglink$coefficients[2,1],2), "* x +",round(reglink$coefficients[1,1])),pos=4)
+            text(0, max(link..$DailyVol[ind])*.81, paste("R-squared =", round(reglink$r.square,2)), pos=4)
+            lines(c(-10000,max(link..$DailyVol*2)), c(-10000,max(link..$DailyVol*2)))
+            abline(reglink, col="red", lwd=2)
+            polygon(c(0,rep(max(link..$DailyVol[ind])*.4,2),0,0), c(rep(max(link..$DailyVol[ind])*.75,2), rep(max(link..$DailyVol[ind])*.95,2), max(link..$DailyVol[ind])*.75)) 
+        } # end if sum == 0 statement
+     } # end of FC loop
+     
      reglink <- summary(lm(link..$DailyVol~link..$DailyRef))
-     plot(link..$DailyRef,link..$DailyVol, xlab="Refenece Daily Volume", ylab="Current Daily Volume", main="Daily Comparison")
+     plot(link..$DailyRef,link..$DailyVol, xlab="Reference Daily Volume", ylab="Current Daily Volume", main="Total Daily Comparison")
      text( 0, max(link..$DailyVol)*.9,
           paste("y =", round(reglink$coefficients[2,1],2), "* x +",round(reglink$coefficients[1,1])),pos=4)
      text(0, max(link..$DailyVol)*.81, paste("R-squared =", round(reglink$r.square,2)), pos=4)
@@ -274,8 +399,27 @@ Png <- list(Width=1000, Height=1200, Res = 150)
      abline(reglink, col="red", lwd=2)
      polygon(c(0,rep(max(link..$DailyVol)*.4,2),0,0), c(rep(max(link..$DailyVol)*.75,2), rep(max(link..$DailyVol)*.95,2), max(link..$DailyVol)*.75)) 
      
+     for(fc in names(FC)){
+
+        ind <- as.character(link..$FC)==fc
+        if(sum(ind)==0) {
+            plot(c(-10000,max(link..$PkVol*2)), c(-10000,max(link..$PkVol*2)),
+               type="l", xlab="Reference Peak Volume", ylab="Current Peak Volume", main=paste(FC[fc],"- Peak Comparison"))
+        } else {
+            plot(link..$PkRef[ind],link..$PkVol[ind],xlim=c(0,max(link..$PkVol[ind])),ylim=c(0,max(link..$PkVol[ind])), 
+               xlab="Reference Peak Volume", ylab="Current Peak Volume", main=paste(FC[fc],"- Peak Comparison"))
+            reglink <- summary(lm(link..$PkVol[ind]~link..$PkRef[ind]))
+            text( 0, max(link..$PkVol[ind])*.9,
+               paste("y =", round(reglink$coefficients[2,1],2), "* x +",round(reglink$coefficients[1,1])),pos=4)
+            text(0, max(link..$PkVol[ind])*.81, paste("R-squared =", round(reglink$r.square,2)), pos=4)
+            lines(c(-10000,max(link..$PkVol*2)), c(-10000,max(link..$PkVol*2)))
+            abline(reglink, col="red", lwd=2)
+            polygon(c(0,rep(max(link..$PkVol[ind])*.4,2),0,0), c(rep(max(link..$PkVol[ind])*.75,2), rep(max(link..$PkVol[ind])*.95,2), max(link..$PkVol[ind])*.75)) 
+        } # end if sum == 0 statement
+     } # end of FC loop
+     
      reglink <- summary(lm(link..$PkVol~link..$PkRef))
-     plot(link..$PkRef,link..$PkVol, xlab= "Refenece Peak Volume", ylab="Current Peak Volume", main=paste("Peak Comparison: ", hourNames[pkHr], "-", hourNames[pkHr+1], sep=""))
+     plot(link..$PkRef,link..$PkVol, xlab= "Reference Peak Volume", ylab="Current Peak Volume", main=paste("Total Peak Comparison: ", hourNames[pkHr], "-", hourNames[pkHr+1], sep=""))
      text( 0, max(link..$PkVol)*.9,
           paste("y =", round(reglink$coefficients[2,1],2), "* x +",round(reglink$coefficients[1,1])),pos=4)
      text(0, max(link..$PkVol)*.81, paste("R-squared =", round(reglink$r.square,2)), pos=4)
@@ -288,9 +432,63 @@ Png <- list(Width=1000, Height=1200, Res = 150)
      
      dev.off()
 
-     rm(reglink)
+     rm(reglink, fc, ind)
+     
+ #VMT / VHT plot 5-26-18
+ #-----------------------------------
 
+     # only plot VHT if TCUR is available
+     ExtraPlot <-ifelse(is.null(link..$TCUR),1,2)  
 
+     # set up plotting device
+     png(paste(reportFolder, "VMT.png", sep="/"), width=Png$Width, height=Png$Height/2*ExtraPlot, res=Png$Res)
+
+     layout(matrix(1:ExtraPlot, byrow=TRUE, ncol=1))
+     par(mar=c(2,4.1,4.1,2.1), oma=c(2,2,2,2))
+
+     # Plot VMT by FC
+     FC <- c("Inter-\nstate", "Major\nArt.", "Minor\nArt.","Collec.", "Local", "Ramps", "All\nLinks")
+     names(FC) <- c(1:5,30, "All")
+     # 6-7-18 AB 
+     # corrected to refer to Link.. and ref$Link, as opposed to the common link.. object
+     # clean FC if needed
+     Link..$FC <- Link..$PLANNO
+     Link..$FC[!(Link..$FC %in% c(1:5,30))] <- 0
+     ref$Link..$FC <- ref$Link..$PLANNO
+     ref$Link..$FC[!(ref$Link..$FC %in% c(1:5,30))] <- 0
+     Current=c(tapply(Link..$LENGTH*Link..$DAILY_VOLUME,Link..$FC,sum), All=sum(Link..$LENGTH*Link..$DAILY_VOLUME))
+     Reference=c(tapply(ref$Link..$LENGTH*ref$Link..$DAILY_VOLUME,ref$Link..$FC,sum), All=sum(ref$Link..$LENGTH*ref$Link..$DAILY_VOLUME)) # 6-6-18 AB corrected pointer to reference
+     #fullNames <- names(FC)[unique(names(Current),names(Reference)) %in% names(FC)]
+     fullNames <- names(FC)[  names(FC) %in% unique(names(Current),names(Reference))]     # 6-8-2018 Fixed by Martin Mann to Index FC Correctly
+     y=rbind(Current=Current[fullNames],Reference=Reference[fullNames]) 
+     x=barplot(y,beside=T, col=c("white", "grey"), legend.text=T, main="VMT by FC", 
+             ylab="Total VMT by FC", names.arg = FC[colnames(y)], args.legend=list(x="topleft"))
+     abline(h=0)
+     yText <- round(y)
+     yText[is.na(yText)] <- "NA"
+     y[is.na(y)] <- 0
+     text(x,ifelse(y<max(y)*.5,y+(max(y)*.2),y-(max(y)*.2)),yText, pos=1, srt=270) 
+     
+     # Plot VHT by FC 
+     if(ExtraPlot==2){
+     Current=c(tapply(Link..$TCUR*Link..$DAILY_VOLUME/3600,Link..$FC,sum), All=sum(Link..$TCUR*Link..$DAILY_VOLUME)/3600)
+     Reference=c(tapply(ref$Link..$TCUR*ref$Link..$DAILY_VOLUME/3600,ref$Link..$FC,sum), All=sum(ref$Link..$TCUR*ref$Link..$DAILY_VOLUME)/3600) # 6-6-18 AB corrected pointer to reference
+     #fullNames <- sort(unique(names(Current),names(Reference)))
+     fullNames <- names(FC)[  names(FC) %in% unique(names(Current),names(Reference))]  # 6-11-18 Adding Martin's fix from VMT
+     y=rbind(Current=Current[fullNames],Reference=Reference[fullNames]) 
+     x=barplot(y,beside=T, col=c("white", "grey"), legend.text=T, main="VHT by FC", 
+             ylab="Total VHT by FC", names.arg = FC[colnames(y)], args.legend=list(x="topleft"))
+     abline(h=0)
+     yText <- round(y)
+     yText[is.na(yText)] <- "NA"
+     y[is.na(y)] <- 0
+     text(x,ifelse(y<max(y)*.5,y+(max(y)*.2),y-(max(y)*.2)),yText, pos=1, srt=270)       
+     } # end if statement of TCUR test
+
+     dev.off()
+     rm(x, y, yText, FC, ExtraPlot, Current, Reference, fullNames)
+     
+     
  #Maximum Desirable Errors for Link Volumes
  #-----------------------------------------
 
@@ -321,16 +519,40 @@ Png <- list(Width=1000, Height=1200, Res = 150)
      link..$Max_Dev <- 2067.56* (link..$DailyRef+1357.62)^ -0.43
 
      dev.off()
+     
+ # time utility plotting  - AB 4/2/2018  
+ #------------------------
+   
+   png(paste(reportFolder, "TimeUtilityCoeff.png", sep="/"), width=Png$Width, height=Png$Height, res=Png$Res)
+   x <- 1:round(max(pk.time))
+   matplot(outer(x,time.coeff[,1]) + outer(x^2,time.coeff[,2]) + outer(x^3,time.coeff[,3]), type="l", 
+          main=paste("Impact of the Time Utility Term at the\nRange of Travel Times in",city), ylab="Time Componetnt of the Utility Function",xlab="Minutes")
+   legend("bottomleft", rownames(time.coeff), lty=1:5,col=1:5)
+   dev.off()
+   # clean up 
+   rm(x) 
+
+# AB 11/14/18 - Updated to add a warning if the errorReport.txt still exists
+# Add a header to highlight if the user still needs to review the errorReport File
+warningHeader <- ifelse(file.exists("errorReport.txt"), "<font size=\"20\", color=\"red\">The errorReport.txt File was generated. This run is not complete until the issues in that file are resolved and the file is then deleted.</font>"," <p>No Input Errors Found During Run</p>")
 
  # Write html to store everything
  #===============================
  writeLines(c("<html>", "<head>",
            "<title>OSUM Run Comparison</title>",
            "</head>","<body>",
-           " <p>The following are comparisons of this model run vs. the Reference file which is defined in the VISUM version as:", 
-           paste(ref$Path,"</p>",sep=""),
+           warningHeader,  # AB 11/14/18 - Updated to add a warning if the errorReport.txt still exists
+           " <p>This Comparison was run on:</p>",    # AB 3/29/18  - Updated to add date and a current scenario reference pointer
+           paste("<p>",date(),"</p>",sep=""),
+           "<p>The following are comparison plots between this model run:</p>",
+           paste("<p>",paste(attr(Visum, "Path"),attr(Visum, "Name"),sep="/"),"</p>",sep=""),  # AB 5-23-18  - Updated to add the version file (not just the OSUM directory) in the current - "this model run"
+            "<p>vs. the Reference file which is defined in the VISUM version as:</p>", 
+           paste("<p>",ref$Path,"</p>",sep=""),
            paste("<div class=\"chunk\" id=\"reporting\"><div class=\"rimage default\"><img src=\"",
                   paste(reportFolder, "TripGen.png", sep="/"),
+                  "\" title=\"plot of chunk reporting\" alt=\"plot of chunk reporting\" class=\"plot\" /></div>",
+                  "<div class=\"rimage default\"><img src=\"",
+                  paste(reportFolder, "WorkerDist.png", sep="/"),
                   "\" title=\"plot of chunk reporting\" alt=\"plot of chunk reporting\" class=\"plot\" /></div>",
                   "<div class=\"rimage default\"><img src=\"",
                   paste(reportFolder, "TripVeh.png", sep="/"),
@@ -344,11 +566,12 @@ Png <- list(Width=1000, Height=1200, Res = 150)
                   "<div class=\"rimage default\"><img src=\"",
                   paste(reportFolder, "LinkScatter.png", sep="/"),
                   "\" title=\"plot of chunk reporting\" alt=\"plot of chunk reporting\" class=\"plot\" /></div>",
-                  "<div class=\"rimage default\"><img src=\"",
-                  paste(reportFolder, "DesireableError.png", sep="/"),
-                  "\" title=\"plot of chunk reporting\" alt=\"plot of chunk reporting\" class=\"plot\" /></div><div class=\"rcode\">",sep=""),
-           paste("<div class=\"output\"><pre class=\"knitr r\">",
-                  paste("Percent of links below the max deviation line: ", round(sum(link..$Max_Dev[ind] > link..$per_dev[ind])/sum(ind)*100,2), "%", sep=""))
+                 "<div class=\"rimage default\"><img src=\"",   # 5-26-18 AB removing DesireableError.png plot from the html
+                  paste(reportFolder, "VMT.png", sep="/"), # adding VMT.png
+                  "\" title=\"plot of chunk reporting\" alt=\"plot of chunk reporting\" class=\"plot\" /></div>",
+                   "<div class=\"rcode\">",sep="")
+#           paste("<div class=\"output\"><pre class=\"knitr r\">",  # 5-26-18 AB - a part of DesireableError.png - removing
+#                  paste("Percent of links below the max deviation line: ", round(sum(link..$Max_Dev[ind] > link..$per_dev[ind])/sum(ind)*100,2), "%", sep=""))
                   ),paste(reportFolder, ".html", sep=""))        
 
            rm(Col, Shape, ind)
@@ -465,6 +688,26 @@ Png <- list(Width=1000, Height=1200, Res = 150)
 
      # add Link data to VISUM
      sapply(names(link..)[5:length(names(link..))], function(x) setNetAtt(Visum,"Links",x,link..[,c("VISUM_ID",x)],initalFilter=T)) 
+
+     # 5-26-18 AB - added extra step to write out reference volume for connectors
+     if(!is.null(ref$Conn..)){
+        conn.. <- Conn..[intersect(rownames(Conn..), rownames(ref$Conn..)),c("VISUM_ID",names(Conn..)[1:3])]
+        conn..[,5:6] <- ref$Conn..[rownames(conn..),c(paste("VOL", hourNames[pkHr], hourNames[pkHr+1], sep="_"), "DAILY_VOLUME")]
+        names(conn..)[5:6] <- c(paste("REF", hourNames[pkHr], hourNames[pkHr+1], sep="_"), "REF_DAILY_VOL")
+     
+        Lists <- comGetProperty(vbConv("Visum.Net"), "Connectors")
+        AddFieldsFlag <- sapply(names(conn..)[5:length(names(conn..))], function(x) is.null(comGetProperty(Lists, "GetMultiAttValues", x))) 
+        AddFields <- as.data.frame(conn..[,(5:length(names(conn..)))[AddFieldsFlag]])
+        names(AddFields) <- names(AddFieldsFlag)[AddFieldsFlag]
+   
+        # Adding fields that don't exits, currently numeric fields are the only ones coded   
+        if(ncol(AddFields)>0) addNetAtt(Visum,"Connectors",AddFields)
+
+        # add Link data to VISUM
+        sapply(names(conn..)[5:length(names(conn..))], function(x) setNetAtt(Visum,"Connectors",x,conn..[,c("VISUM_ID",x)],initalFilter=T)) 
+        rm(conn..)
+
+     } # end if statement to check if connectors table exists
 
      comInvoke(Visum, "SaveVersion", paste(attr(Visum, "Path"),attr(Visum, "Name"),sep="/"))
    

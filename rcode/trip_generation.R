@@ -1,5 +1,5 @@
 # trip_generation_v5.R
-# Code Base (C) 2.1: 3-7-16 (AB)
+# Code Base (C) 2.6: 1-11-18 (AB)
 
 # This program calculates trip generation for small urban areas Oregon by hour of the day
 # 
@@ -11,6 +11,7 @@
 # Updated: 09/02/03 Ben Stabler
 # Updated: 02/14/13 Alex Bettinardi
 # Updated: 08/26/15 Alex Bettinardi
+# Updated: 01/11/18 Alex Bettinardi 
 
 # Copyright (C) 2002  Oregon Department of Transportation
 # This program is free software; you can redistribute it and/or
@@ -43,6 +44,8 @@
 #       Revised for OSUM V2  
 #   8/26/2015
 #       Added a special Astoria handeling of NHB trips when special generators are used
+#   1/11/2018
+#       Corrected error in spec gen external traffic error check (dataed in code below)
 
 #   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   PURPOSE
@@ -151,7 +154,7 @@ calc.trip.gen <- function()
         tot.spec.gen.trips <- sum(spec.ii.trips)
     
         # Quick check that the trips are available
-        spec.ei.tot <- sum(spec.gen$trips)-sum(spec.ii.trips)
+        spec.ei.tot <- sum(spec.gen$trips)-sum(spec.gen$trips * spec.gen$int.pct) # 1-11-18 AB - modified this line to take out the impact of occ from above.
         ei.veh <- sum(ext.traffic[,"adt"] * ext.traffic[,"ei.pct"])
         if(spec.ei.tot > ei.veh){
            stop(paste("\nSpecial Generator External Trips have exceeded EI trips available\nSpec Gen Ext Trips:", spec.ei.tot, "  EI Trips", ei.veh))  
